@@ -1,0 +1,75 @@
+name: Compilar aplicaciones
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows 64 bits
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar constructor
+        run: python -m pip install -r requirements-build.txt
+      - name: Probar
+        run: python -m unittest discover -s tests -v
+      - name: Crear ejecutable
+        run: python -m PyInstaller --noconfirm --clean TextFilter.spec
+      - name: Preparar ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force paquete-windows/input
+          Copy-Item dist/TextFilter.exe paquete-windows/TextFilter.exe
+          Compress-Archive -Path paquete-windows/* -DestinationPath TextFilter-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TextFilter-Windows
+          path: TextFilter-Windows.zip
+
+  mac-apple-silicon:
+    name: Mac Apple Silicon
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar constructor
+        run: python -m pip install -r requirements-build.txt
+      - name: Probar
+        run: python -m unittest discover -s tests -v
+      - name: Crear aplicación
+        run: python -m PyInstaller --noconfirm --clean TextFilter-mac.spec
+      - name: Preparar ZIP
+        run: ditto -c -k --sequesterRsrc --keepParent dist/TextFilter.app TextFilter-Mac-Apple-Silicon.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TextFilter-Mac-Apple-Silicon
+          path: TextFilter-Mac-Apple-Silicon.zip
+
+  mac-intel:
+    name: Mac Intel
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar constructor
+        run: python -m pip install -r requirements-build.txt
+      - name: Probar
+        run: python -m unittest discover -s tests -v
+      - name: Crear aplicación
+        run: python -m PyInstaller --noconfirm --clean TextFilter-mac.spec
+      - name: Preparar ZIP
+        run: ditto -c -k --sequesterRsrc --keepParent dist/TextFilter.app TextFilter-Mac-Intel.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TextFilter-Mac-Intel
+          path: TextFilter-Mac-Intel.zip

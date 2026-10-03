@@ -1,0 +1,15 @@
+.venv/
+.vscode/
+__pycache__/
+.build-venv/
+.build-venv-mac/
+build/
+dist/
+entrega/
+entrega-mac/
+*.spec.bak
+TextFilter-proyecto.zip
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TextFilter — Buscar textos</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #20332c; background: #f3f5f3; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 36px 18px; }
+    main { max-width: 740px; margin: auto; }
+    header { margin-bottom: 24px; }
+    .brand { color: #44735e; font-size: 12px; font-weight: 750; letter-spacing: .15em; }
+    h1 { margin: 10px 0 8px; font-size: 28px; letter-spacing: -.03em; }
+    .hint { color: #596961; font-size: 14px; line-height: 1.6; margin: 0; }
+    form { background: white; padding: 22px; border: 1px solid #dce4de; border-radius: 14px; }
+    label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 650; }
+    .row { display: flex; gap: 10px; }
+    input { min-width: 0; flex: 1; border: 1px solid #aebfb4; border-radius: 8px; padding: 12px; font: inherit; }
+    button { border: 0; border-radius: 8px; padding: 12px 22px; background: #246445; color: white; font: inherit; font-weight: 650; cursor: pointer; }
+    button:hover { background: #194c33; }
+    button:disabled { opacity: .6; cursor: wait; }
+    :focus-visible { outline: 3px solid #8fbca3; outline-offset: 3px; }
+    #status { font-size: 14px; margin: 22px 0 14px; line-height: 1.6; }
+    .empty { padding: 35px 24px; border: 1px dashed #becdc3; border-radius: 12px; text-align: center; color: #617368; line-height: 1.6; }
+    article { background: white; border: 1px solid #dce4de; border-radius: 12px; padding: 22px; margin-bottom: 14px; }
+    article h2 { font-size: 12px; font-weight: 650; color: #4e705c; margin: 0 0 12px; overflow-wrap: anywhere; }
+    article p { margin: 0; line-height: 1.8; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    #errors { color: #8c381c; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+    .uploads { margin-bottom: 16px; padding: 18px 22px; background: #e8efe9; border-radius: 14px; }
+    .uploads button { background: white; color: #246445; border: 1px solid #aebfb4; }
+    #upload-status { margin-top: 10px; white-space: pre-line; overflow-wrap: anywhere; }
+    footer { margin-top: 28px; display: flex; justify-content: flex-end; }
+    .close { padding: 9px 14px; background: transparent; color: #596961; border: 1px solid #becdc3; font-size: 13px; }
+    .close:hover { background: #e5ebe7; color: #20332c; }
+    @media (max-width: 440px) { body { padding: 24px 12px; } form, article { padding: 16px; } button { padding: 12px 16px; } h1 { font-size: 25px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand">TEXTFILTER</div>
+      <h1>Encuentra tus textos</h1>
+      <p class="hint">Busca por código entre los textos resaltados de tus documentos Word.</p>
+    </header>
+    <section class="uploads" aria-label="Agregar documentos">
+      <input type="file" id="files" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple hidden>
+      <button type="button" id="add-files">+ Agregar DOCX</button>
+      <p class="hint" style="margin-top:10px">Selecciona uno o varios documentos. Se guardarán en <strong>input</strong>.</p>
+      <p id="upload-status" class="hint" role="status" aria-live="polite"></p>
+    </section>
+    <form id="search">
+      <label for="code">Código</label>
+      <div class="row">
+        <input id="code" name="code" placeholder="Ej. RCP3" maxlength="200" required autocomplete="off" spellcheck="false" autofocus>
+        <button id="submit" type="submit">Buscar</button>
+      </div>
+      <p class="hint" style="margin-top:12px">Busca en todos los documentos que hayas agregado.</p>
+    </form>
+    <p id="status" role="status" aria-live="polite">Listo para buscar.</p>
+    <div id="errors" role="alert"></div>
+    <section id="results" aria-label="Textos encontrados" aria-busy="false">
+      <div class="empty">Escribe un código para ver aquí los textos encontrados.</div>
+    </section>
+    <footer><button type="button" id="close-app" class="close">Cerrar TextFilter</button></footer>
+  </main>
+  <script>
+    const form = document.querySelector('#search');
+    const input = document.querySelector('#code');
+    const button = document.querySelector('#submit');
+    const status = document.querySelector('#status');
+    const results = document.querySelector('#results');
+    const errors = document.querySelector('#errors');
+    const files = document.querySelector('#files');
+    const addFiles = document.querySelector('#add-files');
+    const uploadStatus = document.querySelector('#upload-status');
+    const closeApp = document.querySelector('#close-app');
+    closeApp.addEventListener('click', async () => {
+      closeApp.disabled = true;
+      try { await fetch('/api/shutdown', {method: 'POST'}); } catch (_) {}
+      document.body.replaceChildren();
+      const message = document.createElement('main');
+      message.innerHTML = '<div class="empty">TextFilter se cerró. Ya puedes cerrar esta pestaña.</div>';
+      document.body.append(message);
+    });
+    addFiles.addEventListener('click', () => files.click());
+    files.addEventListener('change', async () => {
+      const selected = Array.from(files.files);
+      if (!selected.length) return;
+      addFiles.disabled = true;
+      button.disabled = true;
+      const messages = [];
+      let saved = 0;
+      try {
+        for (const [index, file] of selected.entries()) {
+          uploadStatus.textContent = [...messages, `Guardando ${index + 1} de ${selected.length}: ${file.name}…`].join('\n');
+          try {
+            if (!file.name.toLowerCase().endsWith('.docx')) throw new Error('Selecciona un archivo DOCX.');
+            if (!file.size || file.size > 25 * 1024 * 1024) throw new Error('El archivo debe pesar entre 1 byte y 25 MB.');
+            const query = new URLSearchParams({name: file.name});
+            const response = await fetch(`/api/upload?${query}`, {
+              method: 'POST', headers: {'Content-Type': 'application/octet-stream'}, body: file
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'No se pudo guardar el archivo.');
+            messages.push(`Guardado: ${data.file}`);
+            saved++;
+          } catch (error) {
+            messages.push(`${file.name}: ${error instanceof TypeError ? 'No hay conexión con el programa. Comprueba que la terminal siga abierta.' : error.message}`);
+          }
+        }
+        uploadStatus.textContent = messages.join('\n');
+        if (saved) {
+          status.textContent = `${saved} ${saved === 1 ? 'documento agregado' : 'documentos agregados'}. Ya puedes buscar.`;
+          errors.replaceChildren();
+          empty('Pulsa Buscar para consultar los documentos, incluidos los que acabas de agregar.');
+        }
+      } finally {
+        files.value = '';
+        addFiles.disabled = false;
+        button.disabled = false;
+        input.focus();
+      }
+    });
+    function empty(message) {
+      const node = document.createElement('div');
+      node.className = 'empty';
+      node.textContent = message;
+      results.replaceChildren(node);
+    }
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (button.disabled) return;
+      const code = input.value.trim();
+      if (!code) { status.textContent = 'Escribe un código para buscar.'; input.focus(); return; }
+      button.disabled = true;
+      addFiles.disabled = true;
+      input.disabled = true;
+      button.textContent = 'Buscando…';
+      status.textContent = `Buscando «${code}» en tus documentos…`;
+      results.setAttribute('aria-busy', 'true');
+      results.replaceChildren();
+      errors.replaceChildren();
+      try {
+        const response = await fetch('/api/search', {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code})
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'No se pudo completar la búsqueda.');
+        const count = data.results.length;
+        status.textContent = `${count} ${count === 1 ? 'coincidencia' : 'coincidencias'} para «${data.code}» · ${data.documents} ${data.documents === 1 ? 'documento' : 'documentos'}`;
+        if (!count) empty(data.documents === 0
+          ? 'Todavía no hay documentos. Agrega archivos DOCX a input y vuelve a buscar.'
+          : data.errors.length === data.documents
+            ? 'No se pudieron leer los documentos. Revisa los avisos e inténtalo de nuevo.'
+            : 'No se encontraron textos con ese código. Revisa también las mayúsculas y minúsculas.');
+        data.results.forEach((match, index) => {
+          const article = document.createElement('article');
+          const title = document.createElement('h2');
+          title.textContent = `${index + 1} · ${match.file}`;
+          const text = document.createElement('p');
+          text.textContent = match.text;
+          article.append(title, text);
+          results.append(article);
+        });
+        data.errors.forEach(message => {
+          const p = document.createElement('p');
+          p.textContent = message;
+          errors.append(p);
+        });
+      } catch (error) {
+        status.textContent = 'No se pudo completar la búsqueda.';
+        errors.textContent = error instanceof TypeError
+          ? 'No hay conexión con el programa. Comprueba que la terminal siga abierta.' : error.message;
+        empty('Los resultados aparecerán aquí cuando vuelvas a buscar.');
+      } finally {
+        button.disabled = false;
+        addFiles.disabled = false;
+        input.disabled = false;
+        button.textContent = 'Buscar';
+        results.setAttribute('aria-busy', 'false');
+        input.focus();
+      }
+    });
+  </script>
+</body>
+</html>
