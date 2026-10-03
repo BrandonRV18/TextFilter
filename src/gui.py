@@ -80,9 +80,10 @@ def search_documents(code, folder=None):
     for path in files:
         try:
             for _, _, text in extract_matches(path, code):
-                results.append({"file": str(path.relative_to(folder)), "text": text})
+                results.append({"file": path.relative_to(folder).as_posix(), "text": text})
         except (BadZipFile, ET.ParseError, OSError, KeyError, ValueError, RuntimeError, NotImplementedError):
-            errors.append(f"No se pudo leer {path.relative_to(folder)}. Comprueba que sea un DOCX válido y sin contraseña.")
+            relative = path.relative_to(folder).as_posix()
+            errors.append(f"No se pudo leer {relative}. Comprueba que sea un DOCX válido y sin contraseña.")
     return {"code": code, "documents": len(files), "results": results, "errors": errors}
 
 
