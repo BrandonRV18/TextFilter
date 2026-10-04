@@ -96,6 +96,12 @@ La búsqueda distingue mayúsculas y minúsculas e ignora espacios exteriores. D
 
 Los paréntesis alrededor del código son opcionales. Buscar `RCP3` también encuentra `(RCP3)`, y buscar `(RCP3)` también encuentra `RCP3`.
 
+## Catálogo de búsquedas
+
+La interfaz acepta únicamente las categorías definidas: `CCP`, `DCP`, `RCP`, `FCP`, `LCP` y `FPCP`; sus subcódigos; o el nombre completo de una categoría o subcategoría. No distingue mayúsculas, acentos ni espacios dentro de un código. Por ejemplo, `CCP`, `ccp` y `C C P` seleccionan la misma categoría.
+
+Una categoría completa reúne sus subcategorías: `CCP` busca `CCP1`, `CCP2` y `CCP3`. Una búsqueda por `CCP1` devuelve únicamente esa subcategoría. Escribir `Concepcion docente de la cultura de paz`, incluso sin tilde, equivale a buscar `CCP`.
+
 Se unen las partes consecutivas del mismo fondo aunque cambien de fuente o negrita. Un cambio de fondo, un salto de línea o el final del párrafo separan los fragmentos. Se leen el cuerpo, las tablas, los encabezados, los pies de página y las notas al pie y finales. Se reconoce el fondo directo y el heredado de estilos de párrafo o carácter.
 
 No se detectan colores dentro de imágenes, fondos aplicados a párrafos o celdas completas ni formato condicional de estilos de tabla. No admite `.doc`, documentos cifrados ni archivos que solo se hayan renombrado a `.docx`. Los archivos temporales de Word (`~$...`) se omiten. Si un documento falla, continúa con los demás y registra el error en los resultados.

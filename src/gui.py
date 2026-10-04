@@ -14,7 +14,8 @@ import webbrowser
 import xml.etree.ElementTree as ET
 from zipfile import BadZipFile, ZipFile
 
-from .text_filter import ROOT, extract_matches, normalize_code
+from .categories import catalog_options, resolve_query
+from .text_filter import ROOT, extract_matches
 
 MAX_UPLOAD = 25 * 1024 * 1024
 
@@ -104,24 +105,26 @@ def save_document(name, content, folder=None):
 
 def search_documents(code, folder=None):
     folder = ROOT / "input" if folder is None else Path(folder)
-    try:
-        code = normalize_code(code)
-    except ValueError as exc:
-        if not isinstance(code, str) or not code.strip():
-            raise ValueError("Escribe un código para buscar.") from exc
-        raise
+    selection = resolve_query(code)
     if not folder.is_dir():
         raise ValueError("No existe la carpeta input. Créala y coloca allí tus documentos DOCX.")
     files = document_paths(folder)
     results, errors = [], []
     for path in files:
         try:
-            for _, _, text in extract_matches(path, code):
-                results.append({"file": path.relative_to(folder).as_posix(), "text": text})
+            found = {}
+            for selected_code in selection["codes"]:
+                for part, paragraph, text in extract_matches(path, selected_code):
+                    found[(part, paragraph, text)] = {"file": path.relative_to(folder).as_posix(),
+                                                      "text": text, "code": selected_code}
+            for key in sorted(found, key=lambda item: (item[0], item[1], item[2])):
+                results.append(found[key])
         except (BadZipFile, ET.ParseError, OSError, KeyError, ValueError, RuntimeError, NotImplementedError):
             relative = path.relative_to(folder).as_posix()
             errors.append(f"No se pudo leer {relative}. Comprueba que sea un DOCX válido y sin contraseña.")
-    return {"code": code, "documents": len(files), "results": results, "errors": errors}
+    return {"code": selection["query"], "label": selection["label"],
+            "codes": selection["codes"], "documents": len(files),
+            "results": results, "errors": errors}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -144,6 +147,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(200, {"documents": list_documents()})
             except OSError:
                 self.json_response(500, {"error": "No se pudo leer la lista de documentos."})
+            return
+        if route.path == "/api/catalog":
+            self.json_response(200, {"options": catalog_options()})
             return
         if route.path != "/":
             self.send_error(404)

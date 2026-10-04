@@ -40,10 +40,15 @@ class GuiTests(unittest.TestCase):
         self.make_document()
         (self.folder / 'dañado.docx').write_text('archivo inválido')
         result = search_documents(' RCP3 ', self.folder)
-        self.assertEqual(result['results'], [{'file': 'entrevistas/ejemplo.docx', 'text': 'Texto de prueba RCP3'}])
+        self.assertEqual(result['results'], [{'file': 'entrevistas/ejemplo.docx',
+                                              'text': 'Texto de prueba RCP3', 'code': 'RCP3'}])
         self.assertEqual(len(result['errors']), 1)
-        self.assertEqual(search_documents('NO_EXISTE', self.folder)['results'], [])
+        with self.assertRaises(ValueError):
+            search_documents('NO_EXISTE', self.folder)
         self.assertEqual(search_documents('(RCP3)', self.folder)['code'], 'RCP3')
+        self.assertEqual(search_documents('RCP', self.folder)['codes'],
+                         ['RCP1', 'RCP2', 'RCP3', 'RCP4', 'RCP5'])
+        self.assertEqual(len(search_documents('rol docente en la promocion de la cultura de paz', self.folder)['results']), 1)
 
     def test_upload_preserves_duplicates_and_makes_files_searchable(self):
         self.make_document()
@@ -98,6 +103,10 @@ class GuiTests(unittest.TestCase):
                 response = connection.getresponse()
                 self.assertEqual(response.status, 200)
                 self.assertEqual(json.loads(response.read())['documents'][0]['name'], 'entrevistas/ejemplo.docx')
+                connection.request('GET', '/api/catalog')
+                response = connection.getresponse()
+                self.assertEqual(response.status, 200)
+                self.assertEqual(len(json.loads(response.read())['options']), 23)
                 for payload, expected in [({'code': 'RCP3'}, 200), ({'code': ''}, 400), ([], 400)]:
                     connection.request('POST', '/api/search', json.dumps(payload), {'Content-Type': 'application/json'})
                     response = connection.getresponse()
@@ -105,6 +114,10 @@ class GuiTests(unittest.TestCase):
                     body = json.loads(response.read())
                     if expected == 200:
                         self.assertEqual(body['results'][0]['text'], 'Texto de prueba RCP3')
+                connection.request('POST', '/api/search', json.dumps({'code': 'NO_EXISTE'}), {'Content-Type': 'application/json'})
+                response = connection.getresponse()
+                self.assertEqual(response.status, 400)
+                response.read()
                 connection.request('POST', '/api/search', '{"code":"RCP3"}', {'Origin': 'https://example.com'})
                 response = connection.getresponse()
                 self.assertEqual(response.status, 403)

@@ -61,10 +61,11 @@
     <form id="search">
       <label for="code">Código</label>
       <div class="row">
-        <input id="code" name="code" placeholder="Ej. RCP3" maxlength="200" required autocomplete="off" spellcheck="false" autofocus>
+        <input id="code" name="code" list="catalog" placeholder="Ej. RCP, RCP3 o nombre de categoría" maxlength="200" required autocomplete="off" spellcheck="false" autofocus>
+        <datalist id="catalog"></datalist>
         <button id="submit" type="submit">Buscar</button>
       </div>
-      <p class="hint" style="margin-top:12px">Busca en todos los documentos que hayas agregado.</p>
+      <p class="hint" style="margin-top:12px">Usa una categoría completa, un subcódigo o su nombre. Ejemplo: <strong>CCP</strong> reúne CCP1, CCP2 y CCP3.</p>
     </form>
     <p id="status" role="status" aria-live="polite">Listo para buscar.</p>
     <div id="errors" role="alert"></div>
@@ -85,6 +86,25 @@
     const uploadStatus = document.querySelector('#upload-status');
     const documentList = document.querySelector('#document-list');
     const closeApp = document.querySelector('#close-app');
+    const catalog = document.querySelector('#catalog');
+    async function loadCatalog() {
+      try {
+        const response = await fetch('/api/catalog');
+        const data = await response.json();
+        data.options.forEach(item => {
+          const option = document.createElement('option');
+          option.value = item.value;
+          option.label = item.name;
+          catalog.append(option);
+          if (item.type === 'category') {
+            const byName = document.createElement('option');
+            byName.value = item.name;
+            byName.label = `${item.value} · categoría completa`;
+            catalog.append(byName);
+          }
+        });
+      } catch (_) {}
+    }
     closeApp.addEventListener('click', async () => {
       closeApp.disabled = true;
       try { await fetch('/api/shutdown', {method: 'POST'}); } catch (_) {}
@@ -217,7 +237,8 @@
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'No se pudo completar la búsqueda.');
         const count = data.results.length;
-        status.textContent = `${count} ${count === 1 ? 'coincidencia' : 'coincidencias'} para «${data.code}» · ${data.documents} ${data.documents === 1 ? 'documento' : 'documentos'}`;
+        const included = data.codes.length > 1 ? ` · incluye ${data.codes.join(', ')}` : '';
+        status.textContent = `${count} ${count === 1 ? 'coincidencia' : 'coincidencias'} · ${data.code}: ${data.label}${included} · ${data.documents} ${data.documents === 1 ? 'documento' : 'documentos'}`;
         if (!count) empty(data.documents === 0
           ? 'Todavía no hay documentos. Agrega archivos DOCX a input y vuelve a buscar.'
           : data.errors.length === data.documents
@@ -251,6 +272,7 @@
         input.focus();
       }
     });
+    loadCatalog();
   </script>
 </body>
 </html>
