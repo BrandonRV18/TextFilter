@@ -132,24 +132,24 @@
           documentList.append(message);
           return;
         }
-        data.documents.forEach(document => {
+        data.documents.forEach(savedDocument => {
           const row = document.createElement('div');
           row.className = 'document-row';
           const name = document.createElement('span');
           name.className = 'document-name';
-          name.textContent = document.name;
+          name.textContent = savedDocument.name;
           const size = document.createElement('span');
           size.className = 'document-size';
-          size.textContent = readableSize(document.size);
+          size.textContent = readableSize(savedDocument.size);
           const remove = document.createElement('button');
           remove.type = 'button';
           remove.className = 'delete-document';
           remove.textContent = 'Eliminar';
           remove.addEventListener('click', async () => {
-            if (!confirm(`¿Eliminar «${document.name}»? Esta acción no se puede deshacer.`)) return;
+            if (!confirm(`¿Eliminar «${savedDocument.name}»? Esta acción no se puede deshacer.`)) return;
             remove.disabled = true;
             try {
-              const query = new URLSearchParams({name: document.name});
+              const query = new URLSearchParams({name: savedDocument.name});
               const response = await fetch(`/api/documents?${query}`, {method: 'DELETE'});
               const data = await response.json();
               if (!response.ok) throw new Error(data.error || 'No se pudo eliminar el documento.');
