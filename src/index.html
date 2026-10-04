@@ -19,6 +19,8 @@
     input { min-width: 0; flex: 1; border: 1px solid #aebfb4; border-radius: 8px; padding: 12px; font: inherit; }
     button { border: 0; border-radius: 8px; padding: 12px 22px; background: #246445; color: white; font: inherit; font-weight: 650; cursor: pointer; }
     button:hover { background: #194c33; }
+    #clear-search { background: #e8efe9; color: #246445; }
+    #clear-search:hover { background: #d5e3d9; }
     button:disabled { opacity: .6; cursor: wait; }
     :focus-visible { outline: 3px solid #8fbca3; outline-offset: 3px; }
     #status { font-size: 14px; margin: 22px 0 14px; line-height: 1.6; }
@@ -40,7 +42,7 @@
     footer { margin-top: 28px; display: flex; justify-content: flex-end; }
     .close { padding: 9px 14px; background: transparent; color: #596961; border: 1px solid #becdc3; font-size: 13px; }
     .close:hover { background: #e5ebe7; color: #20332c; }
-    @media (max-width: 440px) { body { padding: 24px 12px; } form, article { padding: 16px; } button { padding: 12px 16px; } h1 { font-size: 25px; } }
+    @media (max-width: 440px) { body { padding: 24px 12px; } form, article { padding: 16px; } button { padding: 12px 16px; } h1 { font-size: 25px; } .row { flex-wrap: wrap; } #code { flex-basis: 100%; } }
   </style>
 </head>
 <body>
@@ -64,6 +66,7 @@
         <input id="code" name="code" list="catalog" placeholder="Ej. RCP, RCP3 o nombre de categoría" maxlength="200" required autocomplete="off" spellcheck="false" autofocus>
         <datalist id="catalog"></datalist>
         <button id="submit" type="submit">Buscar</button>
+        <button id="clear-search" type="button">Limpiar</button>
       </div>
       <p class="hint" style="margin-top:12px">Usa una categoría completa, un subcódigo o su nombre. Ejemplo: <strong>CCP</strong> reúne CCP1, CCP2 y CCP3.</p>
     </form>
@@ -78,6 +81,7 @@
     const form = document.querySelector('#search');
     const input = document.querySelector('#code');
     const button = document.querySelector('#submit');
+    const clearSearch = document.querySelector('#clear-search');
     const status = document.querySelector('#status');
     const results = document.querySelector('#results');
     const errors = document.querySelector('#errors');
@@ -217,6 +221,13 @@
       node.textContent = message;
       results.replaceChildren(node);
     }
+    clearSearch.addEventListener('click', () => {
+      input.value = '';
+      errors.replaceChildren();
+      status.textContent = 'Listo para buscar.';
+      empty('Escribe un código para ver aquí los textos encontrados.');
+      input.focus();
+    });
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (button.disabled) return;
@@ -224,6 +235,7 @@
       if (!code) { status.textContent = 'Escribe un código para buscar.'; input.focus(); return; }
       button.disabled = true;
       addFiles.disabled = true;
+      clearSearch.disabled = true;
       input.disabled = true;
       button.textContent = 'Buscando…';
       status.textContent = `Buscando «${code}» en tus documentos…`;
@@ -266,6 +278,7 @@
       } finally {
         button.disabled = false;
         addFiles.disabled = false;
+        clearSearch.disabled = false;
         input.disabled = false;
         button.textContent = 'Buscar';
         results.setAttribute('aria-busy', 'false');
