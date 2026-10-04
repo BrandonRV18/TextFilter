@@ -6,6 +6,7 @@ import json
 import io
 import os
 from pathlib import Path
+from pathlib import PurePosixPath
 import tempfile
 import threading
 from urllib.parse import parse_qs, urlsplit
@@ -16,6 +17,43 @@ from zipfile import BadZipFile, ZipFile
 from .text_filter import ROOT, extract_matches, normalize_code
 
 MAX_UPLOAD = 25 * 1024 * 1024
+
+
+def document_paths(folder):
+    """Devuelve únicamente DOCX normales contenidos en input."""
+    folder = ROOT / "input" if folder is None else Path(folder)
+    if not folder.exists():
+        return []
+    return sorted(path for path in folder.rglob("*") if path.is_file()
+                  and not path.is_symlink() and path.suffix.lower() == ".docx"
+                  and not path.name.startswith("~$"))
+
+
+def list_documents(folder=None):
+    folder = ROOT / "input" if folder is None else Path(folder)
+    return [{"name": path.relative_to(folder).as_posix(), "size": path.stat().st_size}
+            for path in document_paths(folder)]
+
+
+def delete_document(name, folder=None):
+    folder = ROOT / "input" if folder is None else Path(folder)
+    if not isinstance(name, str) or not name or len(name.encode("utf-8")) > 500 or "\\" in name:
+        raise ValueError("El nombre del documento no es válido.")
+    relative = PurePosixPath(name)
+    if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
+        raise ValueError("El nombre del documento no es válido.")
+    candidate = folder.joinpath(*relative.parts)
+    if candidate.suffix.lower() != ".docx" or candidate.name.startswith(("~$", ".")):
+        raise ValueError("Solo se pueden eliminar documentos DOCX de input.")
+    try:
+        root = folder.resolve(strict=True)
+        resolved = candidate.resolve(strict=True)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError("El documento ya no existe.") from exc
+    if not resolved.is_relative_to(root) or not candidate.is_file() or candidate.is_symlink():
+        raise ValueError("El documento no pertenece a input.")
+    candidate.unlink()
+    return relative.as_posix()
 
 
 def save_document(name, content, folder=None):
@@ -74,8 +112,7 @@ def search_documents(code, folder=None):
         raise
     if not folder.is_dir():
         raise ValueError("No existe la carpeta input. Créala y coloca allí tus documentos DOCX.")
-    files = sorted(path for path in folder.rglob("*") if path.is_file()
-                   and path.suffix.lower() == ".docx" and not path.name.startswith("~$"))
+    files = document_paths(folder)
     results, errors = [], []
     for path in files:
         try:
@@ -101,10 +138,43 @@ class Handler(BaseHTTPRequestHandler):
         self.respond(status, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
 
     def do_GET(self):
-        if self.path != "/":
+        route = urlsplit(self.path)
+        if route.path == "/api/documents":
+            try:
+                self.json_response(200, {"documents": list_documents()})
+            except OSError:
+                self.json_response(500, {"error": "No se pudo leer la lista de documentos."})
+            return
+        if route.path != "/":
             self.send_error(404)
             return
         self.respond(200, Path(__file__).with_name("index.html").read_bytes(), "text/html; charset=utf-8")
+
+    def valid_origin(self):
+        origin = self.headers.get("Origin")
+        return not origin or origin == f"http://127.0.0.1:{self.server.server_port}"
+
+    def do_DELETE(self):
+        route = urlsplit(self.path)
+        if route.path != "/api/documents":
+            self.send_error(404)
+            return
+        if not self.valid_origin():
+            self.json_response(403, {"error": "Abre la interfaz desde su dirección local."})
+            return
+        try:
+            name = parse_qs(route.query).get("name", [""])[0]
+            deleted = delete_document(name)
+        except FileNotFoundError as exc:
+            self.json_response(404, {"error": str(exc)})
+            return
+        except ValueError as exc:
+            self.json_response(400, {"error": str(exc)})
+            return
+        except OSError:
+            self.json_response(500, {"error": "No se pudo eliminar el documento."})
+            return
+        self.json_response(200, {"file": deleted})
 
     def do_POST(self):
         route = urlsplit(self.path)
@@ -112,8 +182,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         # Solo la página local puede enviar búsquedas desde un navegador.
-        origin = self.headers.get("Origin")
-        if origin and origin != f"http://127.0.0.1:{self.server.server_port}":
+        if not self.valid_origin():
             self.json_response(403, {"error": "Abre la interfaz desde su dirección local."})
             return
         try:

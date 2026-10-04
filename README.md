@@ -59,6 +59,8 @@ Se abrirá una interfaz pequeña en tu navegador. Escribe el código (por ejempl
 
 Usa **+ Agregar DOCX** para seleccionar uno o varios documentos desde la misma interfaz. Se guardan automáticamente en `input` y quedan disponibles para la siguiente búsqueda. Admite hasta 25 MB por archivo y comprueba que sea un DOCX válido. Si ya existe el nombre, conserva ambos archivos agregando un número al nuevo (por ejemplo, `entrevista (1).docx`). La interfaz confirma cada archivo guardado o indica el error correspondiente.
 
+Los archivos guardados aparecen en **Documentos guardados**. Usa **Eliminar** y confirma para borrar definitivamente un DOCX de `input`; después vuelve a realizar la búsqueda para actualizar los resultados.
+
 La interfaz funciona localmente, sin subir documentos a internet. Deja la terminal abierta mientras la utilizas; para detener el programa pulsa `Ctrl+C`. Si el navegador no se abre automáticamente, entra en la dirección que aparece en la terminal. También puedes usar `python3 app.py --no-browser`.
 
 Las búsquedas gráficas muestran los resultados en pantalla. Para guardarlos en un archivo, puedes seguir usando la versión de terminal.

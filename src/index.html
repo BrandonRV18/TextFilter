@@ -30,6 +30,13 @@
     .uploads { margin-bottom: 16px; padding: 18px 22px; background: #e8efe9; border-radius: 14px; }
     .uploads button { background: white; color: #246445; border: 1px solid #aebfb4; }
     #upload-status { margin-top: 10px; white-space: pre-line; overflow-wrap: anywhere; }
+    .documents-title { margin: 18px 0 8px; font-size: 13px; }
+    .document-list { display: grid; gap: 7px; }
+    .document-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: white; border: 1px solid #d5dfd8; border-radius: 8px; }
+    .document-name { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+    .document-size { color: #748279; font-size: 12px; white-space: nowrap; }
+    .uploads .delete-document { padding: 7px 10px; color: #963c2e; border-color: #dab8b2; font-size: 12px; }
+    .uploads .delete-document:hover { background: #f7e8e5; color: #76281d; }
     footer { margin-top: 28px; display: flex; justify-content: flex-end; }
     .close { padding: 9px 14px; background: transparent; color: #596961; border: 1px solid #becdc3; font-size: 13px; }
     .close:hover { background: #e5ebe7; color: #20332c; }
@@ -48,6 +55,8 @@
       <button type="button" id="add-files">+ Agregar DOCX</button>
       <p class="hint" style="margin-top:10px">Selecciona uno o varios documentos. Se guardarán en <strong>input</strong>.</p>
       <p id="upload-status" class="hint" role="status" aria-live="polite"></p>
+      <h2 class="documents-title">Documentos guardados</h2>
+      <div id="document-list" class="document-list"><span class="hint">Cargando…</span></div>
     </section>
     <form id="search">
       <label for="code">Código</label>
@@ -74,6 +83,7 @@
     const files = document.querySelector('#files');
     const addFiles = document.querySelector('#add-files');
     const uploadStatus = document.querySelector('#upload-status');
+    const documentList = document.querySelector('#document-list');
     const closeApp = document.querySelector('#close-app');
     closeApp.addEventListener('click', async () => {
       closeApp.disabled = true;
@@ -84,6 +94,63 @@
       document.body.append(message);
     });
     addFiles.addEventListener('click', () => files.click());
+    function readableSize(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    async function refreshDocuments() {
+      try {
+        const response = await fetch('/api/documents');
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'No se pudieron consultar los documentos.');
+        documentList.replaceChildren();
+        if (!data.documents.length) {
+          const message = document.createElement('span');
+          message.className = 'hint';
+          message.textContent = 'No hay documentos agregados.';
+          documentList.append(message);
+          return;
+        }
+        data.documents.forEach(document => {
+          const row = document.createElement('div');
+          row.className = 'document-row';
+          const name = document.createElement('span');
+          name.className = 'document-name';
+          name.textContent = document.name;
+          const size = document.createElement('span');
+          size.className = 'document-size';
+          size.textContent = readableSize(document.size);
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'delete-document';
+          remove.textContent = 'Eliminar';
+          remove.addEventListener('click', async () => {
+            if (!confirm(`¿Eliminar «${document.name}»? Esta acción no se puede deshacer.`)) return;
+            remove.disabled = true;
+            try {
+              const query = new URLSearchParams({name: document.name});
+              const response = await fetch(`/api/documents?${query}`, {method: 'DELETE'});
+              const data = await response.json();
+              if (!response.ok) throw new Error(data.error || 'No se pudo eliminar el documento.');
+              uploadStatus.textContent = `Eliminado: ${data.file}`;
+              status.textContent = 'Documento eliminado. Realiza nuevamente la búsqueda para actualizar los resultados.';
+              empty('Escribe un código y pulsa Buscar para actualizar los resultados.');
+              await refreshDocuments();
+            } catch (error) {
+              uploadStatus.textContent = error instanceof TypeError
+                ? 'No hay conexión con el programa. Comprueba que siga abierto.' : error.message;
+              remove.disabled = false;
+            }
+          });
+          row.append(name, size, remove);
+          documentList.append(row);
+        });
+      } catch (error) {
+        documentList.textContent = error instanceof TypeError
+          ? 'No hay conexión con el programa.' : error.message;
+      }
+    }
     files.addEventListener('change', async () => {
       const selected = Array.from(files.files);
       if (!selected.length) return;
@@ -114,6 +181,7 @@
           status.textContent = `${saved} ${saved === 1 ? 'documento agregado' : 'documentos agregados'}. Ya puedes buscar.`;
           errors.replaceChildren();
           empty('Pulsa Buscar para consultar los documentos, incluidos los que acabas de agregar.');
+          await refreshDocuments();
         }
       } finally {
         files.value = '';
@@ -122,6 +190,7 @@
         input.focus();
       }
     });
+    refreshDocuments();
     function empty(message) {
       const node = document.createElement('div');
       node.className = 'empty';
