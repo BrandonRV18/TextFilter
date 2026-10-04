@@ -107,6 +107,10 @@ class GuiTests(unittest.TestCase):
                 response = connection.getresponse()
                 self.assertEqual(response.status, 200)
                 self.assertEqual(len(json.loads(response.read())['options']), 23)
+                connection.request('GET', '/api/health')
+                response = connection.getresponse()
+                self.assertEqual(response.status, 200)
+                self.assertEqual(json.loads(response.read())['app'], 'TextFilter')
                 for payload, expected in [({'code': 'RCP3'}, 200), ({'code': ''}, 400), ([], 400)]:
                     connection.request('POST', '/api/search', json.dumps(payload), {'Content-Type': 'application/json'})
                     response = connection.getresponse()

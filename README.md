@@ -57,6 +57,8 @@ python3 app.py
 
 Se abrirá una interfaz pequeña en tu navegador. Escribe el código (por ejemplo, `RCP3`) y pulsa **Buscar** o **Enter**. Los textos aparecen debajo con el nombre del documento y puedes seleccionarlos y copiarlos. Lee todos los DOCX de `input` y sus subcarpetas en cada búsqueda.
 
+La dirección local es siempre `http://127.0.0.1:8765`. No abras `src/index.html` directamente: primero ejecuta `python3 app.py` y deja esa terminal abierta. Si ejecutas TextFilter otra vez mientras ya está funcionando, abrirá la instancia existente.
+
 Usa **+ Agregar DOCX** para seleccionar uno o varios documentos desde la misma interfaz. Se guardan automáticamente en `input` y quedan disponibles para la siguiente búsqueda. Admite hasta 25 MB por archivo y comprueba que sea un DOCX válido. Si ya existe el nombre, conserva ambos archivos agregando un número al nuevo (por ejemplo, `entrevista (1).docx`). La interfaz confirma cada archivo guardado o indica el error correspondiente.
 
 Los archivos guardados aparecen en **Documentos guardados**. Usa **Eliminar** y confirma para borrar definitivamente un DOCX de `input`; después vuelve a realizar la búsqueda para actualizar los resultados.

@@ -10,6 +10,7 @@ from pathlib import PurePosixPath
 import tempfile
 import threading
 from urllib.parse import parse_qs, urlsplit
+from urllib.request import urlopen
 import webbrowser
 import xml.etree.ElementTree as ET
 from zipfile import BadZipFile, ZipFile
@@ -18,6 +19,7 @@ from .categories import catalog_options, resolve_query
 from .text_filter import ROOT, extract_matches
 
 MAX_UPLOAD = 25 * 1024 * 1024
+DEFAULT_PORT = 8765
 
 
 def document_paths(folder):
@@ -151,6 +153,9 @@ class Handler(BaseHTTPRequestHandler):
         if route.path == "/api/catalog":
             self.json_response(200, {"options": catalog_options()})
             return
+        if route.path == "/api/health":
+            self.json_response(200, {"app": "TextFilter"})
+            return
         if route.path != "/":
             self.send_error(404)
             return
@@ -232,9 +237,26 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description="Interfaz gráfica local de TextFilter")
     parser.add_argument("--no-browser", action="store_true", help="No abrir automáticamente el navegador")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Puerto local (predeterminado: 8765)")
     args = parser.parse_args()
-    with ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
-        url = f"http://127.0.0.1:{server.server_port}"
+    if not 1024 <= args.port <= 65535:
+        parser.error("El puerto debe estar entre 1024 y 65535.")
+    url = f"http://127.0.0.1:{args.port}"
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    except OSError:
+        try:
+            with urlopen(url + "/api/health", timeout=2) as response:
+                running = json.load(response).get("app") == "TextFilter"
+        except (OSError, ValueError):
+            running = False
+        if not running:
+            parser.error(f"El puerto {args.port} está ocupado por otro programa.")
+        print(f"TextFilter ya está abierto en {url}", flush=True)
+        if not args.no_browser:
+            webbrowser.open(url)
+        return
+    with server:
         print(f"TextFilter está disponible en {url}", flush=True)
         print("Para cerrar el programa usa el botón de la interfaz o presiona Ctrl+C.", flush=True)
         if not args.no_browser:
