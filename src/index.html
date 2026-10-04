@@ -13,6 +13,11 @@
     .brand { color: #44735e; font-size: 12px; font-weight: 750; letter-spacing: .15em; }
     h1 { margin: 10px 0 8px; font-size: 28px; letter-spacing: -.03em; }
     .hint { color: #596961; font-size: 14px; line-height: 1.6; margin: 0; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; padding: 5px; background: #e3eae5; border-radius: 12px; }
+    .tab-button { flex: 1; padding: 10px 16px; background: transparent; color: #52645a; }
+    .tab-button:hover { background: #d4e0d7; color: #20332c; }
+    .tab-button[aria-selected="true"] { background: white; color: #246445; box-shadow: 0 1px 3px #1f3b2d1f; }
+    .tab-panel[hidden] { display: none; }
     form { background: white; padding: 22px; border: 1px solid #dce4de; border-radius: 14px; }
     label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 650; }
     .row { display: flex; gap: 10px; }
@@ -52,28 +57,36 @@
       <h1>Encuentra tus textos</h1>
       <p class="hint">Busca por código entre los textos resaltados de tus documentos Word.</p>
     </header>
-    <section class="uploads" aria-label="Agregar documentos">
-      <input type="file" id="files" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple hidden>
-      <button type="button" id="add-files">+ Agregar DOCX</button>
-      <p class="hint" style="margin-top:10px">Selecciona uno o varios documentos. Se guardarán en <strong>input</strong>.</p>
-      <p id="upload-status" class="hint" role="status" aria-live="polite"></p>
-      <h2 class="documents-title">Documentos guardados</h2>
-      <div id="document-list" class="document-list"><span class="hint">Cargando…</span></div>
+    <nav class="tabs" role="tablist" aria-label="Secciones de TextFilter">
+      <button type="button" class="tab-button" id="search-tab" role="tab" aria-selected="true" aria-controls="search-panel">Buscar</button>
+      <button type="button" class="tab-button" id="documents-tab" role="tab" aria-selected="false" aria-controls="documents-panel">Documentos</button>
+    </nav>
+    <section id="search-panel" class="tab-panel" role="tabpanel" aria-labelledby="search-tab">
+      <form id="search">
+        <label for="code">Código</label>
+        <div class="row">
+          <input id="code" name="code" list="catalog" placeholder="Ej. RCP, RCP3 o nombre de categoría" maxlength="200" required autocomplete="off" spellcheck="false" autofocus>
+          <datalist id="catalog"></datalist>
+          <button id="submit" type="submit">Buscar</button>
+          <button id="clear-search" type="button">Limpiar</button>
+        </div>
+        <p class="hint" style="margin-top:12px">Usa una categoría completa, un subcódigo o su nombre. Ejemplo: <strong>CCP</strong> reúne CCP1, CCP2 y CCP3.</p>
+      </form>
+      <p id="status" role="status" aria-live="polite">Listo para buscar.</p>
+      <div id="errors" role="alert"></div>
+      <section id="results" aria-label="Textos encontrados" aria-busy="false">
+        <div class="empty">Escribe un código para ver aquí los textos encontrados.</div>
+      </section>
     </section>
-    <form id="search">
-      <label for="code">Código</label>
-      <div class="row">
-        <input id="code" name="code" list="catalog" placeholder="Ej. RCP, RCP3 o nombre de categoría" maxlength="200" required autocomplete="off" spellcheck="false" autofocus>
-        <datalist id="catalog"></datalist>
-        <button id="submit" type="submit">Buscar</button>
-        <button id="clear-search" type="button">Limpiar</button>
+    <section id="documents-panel" class="tab-panel" role="tabpanel" aria-labelledby="documents-tab" hidden>
+      <div class="uploads" aria-label="Administrar documentos">
+        <input type="file" id="files" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple hidden>
+        <button type="button" id="add-files">+ Agregar DOCX</button>
+        <p class="hint" style="margin-top:10px">Selecciona uno o varios documentos. Se guardarán en <strong>input</strong>.</p>
+        <p id="upload-status" class="hint" role="status" aria-live="polite"></p>
+        <h2 class="documents-title">Documentos guardados</h2>
+        <div id="document-list" class="document-list"><span class="hint">Cargando…</span></div>
       </div>
-      <p class="hint" style="margin-top:12px">Usa una categoría completa, un subcódigo o su nombre. Ejemplo: <strong>CCP</strong> reúne CCP1, CCP2 y CCP3.</p>
-    </form>
-    <p id="status" role="status" aria-live="polite">Listo para buscar.</p>
-    <div id="errors" role="alert"></div>
-    <section id="results" aria-label="Textos encontrados" aria-busy="false">
-      <div class="empty">Escribe un código para ver aquí los textos encontrados.</div>
     </section>
     <footer><button type="button" id="close-app" class="close">Cerrar TextFilter</button></footer>
   </main>
@@ -91,6 +104,15 @@
     const documentList = document.querySelector('#document-list');
     const closeApp = document.querySelector('#close-app');
     const catalog = document.querySelector('#catalog');
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+    const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+    function showTab(tab) {
+      tabs.forEach(item => item.setAttribute('aria-selected', String(item === tab)));
+      panels.forEach(panel => { panel.hidden = panel.id !== tab.getAttribute('aria-controls'); });
+      if (tab.id === 'documents-tab') refreshDocuments();
+      if (tab.id === 'search-tab') input.focus();
+    }
+    tabs.forEach(tab => tab.addEventListener('click', () => showTab(tab)));
     async function loadCatalog() {
       try {
         const response = await fetch('/api/catalog');
